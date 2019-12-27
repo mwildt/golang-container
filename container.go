@@ -23,6 +23,8 @@ const (
 	RESOLVED
 )
 
+var errorInterface = reflect.TypeOf((*error)(nil)).Elem()
+
 /**
  * An internal structure für handling single producer-functions (caching, state-handling)
  */
@@ -49,7 +51,6 @@ func (provider *provider) get(container *Container) (reflect.Value, error) {
 		}
 		providerCallResults := reflect.ValueOf(provider.producer).Call(producerCallArgs)
 		//fmt.Printf("providerCallResults %s \n", providerCallResults)
-		errorInterface := reflect.TypeOf((*error)(nil)).Elem()
 		for _, returnElement := range providerCallResults {
 			if returnElement.Type().AssignableTo(provider.producedType) && !returnElement.IsNil() {
 				provider.value = returnElement
@@ -74,7 +75,6 @@ func (provider *provider) get(container *Container) (reflect.Value, error) {
 }
 
 func getType(producer interface{}) reflect.Type {
-	errorInterface := reflect.TypeOf((*error)(nil)).Elem()
 	t := reflect.TypeOf(producer)
 	for i := 0; i < t.NumOut(); i++ {
 		out := t.Out(i)
@@ -95,7 +95,6 @@ func newProvider(producer interface{}) *provider{
 	p.value = reflect.NewAt(producedType, nil)
 	return p
 }
-
 
 func NewContainer() *Container {
 	container := new(Container)
@@ -125,7 +124,13 @@ func(container *Container) With(target interface{}) error {
 			return err
 		}
 	}
-	v.Call(parameter)
+
+	for _, returnValue := range v.Call(parameter) {
+		if returnValue.Type().Implements(errorInterface) && !returnValue.IsNil() {
+			return returnValue.Interface().(error)
+		}
+	}
+
 	return nil
 }
 
@@ -151,4 +156,3 @@ func  (container *Container)  findProviderFor(t reflect.Type) interface{} {
 	}
 	return nil
 }
-

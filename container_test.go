@@ -155,3 +155,17 @@ func TestContaineShouldFailOnCyclicDependency(t *testing.T) {
 		t.Error("call to cyclic dependent component should return an error")
 	}
 }
+
+func TestContainerPropagatesErrorsFromWithCalles(t *testing.T) {
+	msg := "FEHLER"
+	container := NewContainer()
+	err := container.With(func(c *Container) error {
+		return errors.New(msg)
+	})
+	if nil == err {
+		t.Error("With-Call should have returned an error but didnt ")
+	}
+	if err.Error() != msg {
+		t.Error(fmt.Sprintf("message should be %s but was %s", msg, err.Error()))
+	}
+}
