@@ -37,7 +37,7 @@ func (container *Container) Singleton(producer interface{}) error {
 /**
  * Invokes a target-function with params resolved from the containers context
  */
-func(container *Container) With(target interface{}) error {
+func(container *Container) Execute(target interface{}) error {
 	if reflect.TypeOf(target).Kind() != reflect.Func {
 		return errors.New("target is not of Kind reflect.Func")
 	}
@@ -53,6 +53,15 @@ func(container *Container) With(target interface{}) error {
 	return nil
 }
 
+func (container *Container) find(t reflect.Type) (reflect.Value, error) {
+	provider, providerExists := container.providers[t]
+	if !providerExists {
+		return reflect.NewAt(t.Elem(), nil), errors.New(fmt.Sprintf("no Provider found for type, %s", t))
+	} else {
+		return provider.get(container)
+	}
+}
+
 func (container *Container) call(target interface{}) ([]reflect.Value, error) {
 	targetType := reflect.TypeOf(target)
 	parameter := make([]reflect.Value, targetType.NumIn())
@@ -65,15 +74,6 @@ func (container *Container) call(target interface{}) ([]reflect.Value, error) {
 		}
 	}
 	return reflect.ValueOf(target).Call(parameter), nil
-}
-
-func (container *Container) find(t reflect.Type) (reflect.Value, error) {
-	provider, providerExists := container.providers[t]
-	if !providerExists {
-		return reflect.NewAt(t.Elem(), nil), errors.New(fmt.Sprintf("no Provider found for type, %s", t))
-	} else {
-		return provider.get(container)
-	}
 }
 
 func  (container *Container)  findProviderFor(t reflect.Type) interface{} {

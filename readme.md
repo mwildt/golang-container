@@ -2,16 +2,27 @@
 
 A very simple DI-Container for Golang.
 
-## Register Factory Function
-
 ```go
 
 type MyService struct {}
 
+func (s *MyService) someAction(){
+	...
+}
+
+func myServiceFactory() (*MyService, error) {
+    return &MyService{}, nil
+}
+```
+
+##  Register a factory function and execute a function with registered components as parameters
+
+```go
 func main() {
     container := NewContainer()
-    container.Singleton(func() (*MyService, error) {
-    	return &MyService{}, nil
+    container.Singleton(myServiceFactory)
+    container.Execute(func(service *MyService) {
+    	myService.someAction()
     })
 }
 ```
