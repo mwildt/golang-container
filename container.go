@@ -37,41 +37,36 @@ type provider struct {
 
 func (provider *provider) get(container *Container) (reflect.Value, error) {
 	switch provider.state {
-	case UNRESOLVED: {
-		provider.state = RESOLVING
-		producerType := reflect.TypeOf(provider.producer)
-		producerCallArgs := make([]reflect.Value, producerType.NumIn())
-		for i := 0;  i<producerType.NumIn(); i++ {
-			paramType := producerType.In(i)
-			var err error
-			producerCallArgs[i], err = container.find(paramType)
-			if nil != err {
-				return reflect.NewAt(provider.producedType, nil), err
-			}
+		case UNRESOLVED: {
+			return provider.resovle(container)
 		}
-		providerCallResults := reflect.ValueOf(provider.producer).Call(producerCallArgs)
-		//fmt.Printf("providerCallResults %s \n", providerCallResults)
-		for _, returnElement := range providerCallResults {
-			if returnElement.Type().AssignableTo(provider.producedType) && !returnElement.IsNil() {
-				provider.value = returnElement
-				provider.state = RESOLVED
-				//log.Printf("UNRESOLVED RETURN value %s\n", provider.value)
-				return provider.value, nil
-			} else if returnElement.Type().Implements(errorInterface) && !returnElement.IsNil() {
-				//log.Printf("UNRESOLVED RETURN err %s\n", returnElement.Interface().(error))
-				return reflect.NewAt(provider.producedType, nil), returnElement.Interface().(error)
-			}
+		case RESOLVING: {
+			return reflect.NewAt(provider.producedType, nil), errors.New("provider is already resolving: cyclic dependency detected")
 		}
-		return reflect.NewAt(provider.producedType, nil), errors.New(fmt.Sprintf("unable to identity correct return value for type %s\n", provider.producedType))
-	}
-	case RESOLVING: {
-		return reflect.NewAt(provider.producedType, nil), errors.New("provider is already resolving: cyclic dependency detected")
-	}
-	case RESOLVED: {
-		return provider.value, nil
-	}
+		case RESOLVED: {
+			return provider.value, nil
+		}
 	}
 	return reflect.NewAt(provider.producedType, nil), errors.New("illegal state: a provider should always have defined state")
+}
+
+func (provider *provider) resovle(container *Container) (reflect.Value, error) {
+	provider.state = RESOLVING
+	providerCallResults, err := container.call(provider.producer)
+	if nil != err {
+		return reflect.NewAt(provider.producedType, nil), err
+	}
+
+	for _, returnElement := range providerCallResults {
+		if returnElement.Type().AssignableTo(provider.producedType) && !returnElement.IsNil() {
+			provider.value = returnElement
+			provider.state = RESOLVED
+			return provider.value, nil
+		} else if returnElement.Type().Implements(errorInterface) && !returnElement.IsNil() {
+			return reflect.NewAt(provider.producedType, nil), returnElement.Interface().(error)
+		}
+	}
+	return reflect.NewAt(provider.producedType, nil), errors.New(fmt.Sprintf("unable to identity correct return value for type %s\n", provider.producedType))
 }
 
 func getType(producer interface{}) reflect.Type {
@@ -80,7 +75,6 @@ func getType(producer interface{}) reflect.Type {
 		out := t.Out(i)
 		if !out.Implements(errorInterface) {
 			return out
-		} else {
 		}
 	}
 	return nil
@@ -110,27 +104,30 @@ func (container *Container) Provide(producer interface{}) {
 	container.providers[provider.producedType] = provider
 }
 
-func(container *Container) With(target interface{}) error {
-	t := reflect.TypeOf(target)
-	v := reflect.ValueOf(target)
-	parameter := make([]reflect.Value, 1)
-	for i := 0;  i<t.NumIn(); i++ {
-		paramType := t.In(i)
+func (container *Container) call(target interface{}) ([]reflect.Value, error) {
+	targetType := reflect.TypeOf(target)
+	parameter := make([]reflect.Value, targetType.NumIn())
+	for i := 0;  i< targetType.NumIn(); i++ {
+		paramType := targetType.In(i)
 		var err error
 		parameter[i], err = container.find(paramType)
-		//log.Printf("[Container:With] got [%s|%s] \n", parameter[i], err)
 		if err != nil {
-			//log.Printf("got error [%s] finding param for type [%s]\n", err, paramType)
-			return err
+			return nil, err
 		}
 	}
+	return reflect.ValueOf(target).Call(parameter), nil
+}
 
-	for _, returnValue := range v.Call(parameter) {
+func(container *Container) With(target interface{}) error {
+	values, err := container.call(target)
+	if nil != err {
+		return err
+	}
+	for _, returnValue := range values {
 		if returnValue.Type().Implements(errorInterface) && !returnValue.IsNil() {
 			return returnValue.Interface().(error)
 		}
 	}
-
 	return nil
 }
 
@@ -140,11 +137,7 @@ func (container *Container) find(t reflect.Type) (reflect.Value, error) {
 	if !providerExists {
 		return reflect.NewAt(t.Elem(), nil), errors.New(fmt.Sprintf("no Provider found for type, %s", t))
 	} else {
-		value, err :=  provider.get(container)
-		if err != nil {
-			return reflect.NewAt(t.Elem(), nil), err
-		}
-		return value, nil
+		return provider.get(container)
 	}
 }
 
