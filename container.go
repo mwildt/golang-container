@@ -48,9 +48,20 @@ func (provider *provider) get(container *Container) (reflect.Value, error) {
 			}
 		}
 		providerCallResults := reflect.ValueOf(provider.producer).Call(producerCallArgs)
-		provider.value = providerCallResults[0]
-		provider.state = RESOLVED
-		return provider.value, nil
+		//fmt.Printf("providerCallResults %s \n", providerCallResults)
+		errorInterface := reflect.TypeOf((*error)(nil)).Elem()
+		for _, returnElement := range providerCallResults {
+			if returnElement.Type().AssignableTo(provider.producedType) && !returnElement.IsNil() {
+				provider.value = returnElement
+				provider.state = RESOLVED
+				//log.Printf("UNRESOLVED RETURN value %s\n", provider.value)
+				return provider.value, nil
+			} else if returnElement.Type().Implements(errorInterface) && !returnElement.IsNil() {
+				//log.Printf("UNRESOLVED RETURN err %s\n", returnElement.Interface().(error))
+				return reflect.NewAt(provider.producedType, nil), returnElement.Interface().(error)
+			}
+		}
+		return reflect.NewAt(provider.producedType, nil), errors.New(fmt.Sprintf("unable to identity correct return value for type %s\n", provider.producedType))
 	}
 	case RESOLVING: {
 		return reflect.NewAt(provider.producedType, nil), errors.New("provider is already resolving: cyclic dependency detected")
@@ -62,9 +73,17 @@ func (provider *provider) get(container *Container) (reflect.Value, error) {
 	return reflect.NewAt(provider.producedType, nil), errors.New("illegal state: a provider should always have defined state")
 }
 
-
 func getType(producer interface{}) reflect.Type {
-	return reflect.TypeOf(producer).Out(0)
+	errorInterface := reflect.TypeOf((*error)(nil)).Elem()
+	t := reflect.TypeOf(producer)
+	for i := 0; i < t.NumOut(); i++ {
+		out := t.Out(i)
+		if !out.Implements(errorInterface) {
+			return out
+		} else {
+		}
+	}
+	return nil
 }
 
 func newProvider(producer interface{}) *provider{
@@ -81,11 +100,9 @@ func newProvider(producer interface{}) *provider{
 func NewContainer() *Container {
 	container := new(Container)
 	container.providers = make(map[reflect.Type]*provider)
-
 	container.Provide(func() *Container {
 		return container
 	})
-
 	return container
 }
 
@@ -102,7 +119,9 @@ func(container *Container) With(target interface{}) error {
 		paramType := t.In(i)
 		var err error
 		parameter[i], err = container.find(paramType)
+		//log.Printf("[Container:With] got [%s|%s] \n", parameter[i], err)
 		if err != nil {
+			//log.Printf("got error [%s] finding param for type [%s]\n", err, paramType)
 			return err
 		}
 	}
@@ -111,6 +130,7 @@ func(container *Container) With(target interface{}) error {
 }
 
 func (container *Container) find(t reflect.Type) (reflect.Value, error) {
+	//log.Printf("Container::find %s\n", t)
 	provider, providerExists := container.providers[t]
 	if !providerExists {
 		return reflect.NewAt(t.Elem(), nil), errors.New(fmt.Sprintf("no Provider found for type, %s", t))
