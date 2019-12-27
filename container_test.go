@@ -15,7 +15,7 @@ func (repository Repository) getValue() string {
 
 func TestGetTypeForErrorReturningFuncs(t *testing.T) {
 	type A struct {}
-	res := getType(func() (error, *A) {
+	res := getReturnType(func() (error, *A) {
 		return nil, nil
 	})
 	if res != reflect.TypeOf(&A{}) {
@@ -25,7 +25,7 @@ func TestGetTypeForErrorReturningFuncs(t *testing.T) {
 
 func TestGetTypeForErrorReturningFuncsWithTypeFirst(t *testing.T) {
 	type A struct {}
-	res := getType(func() (*A, error) {
+	res := getReturnType(func() (*A, error) {
 		return nil, nil
 	})
 	if res != reflect.TypeOf(&A{}) {
