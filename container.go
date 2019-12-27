@@ -1,4 +1,4 @@
-package main
+package container
 
 import (
 	"errors"
@@ -6,24 +6,62 @@ import (
 	"reflect"
 )
 
+/**
+ * The Dependency-Container
+ */
 type Container struct {
 	providers map[reflect.Type]*provider
 }
 
+/**
+ * util states for detecting cyclic dependencies
+ */
 type providerState int
-
 const (
 	UNRESOLVED providerState = iota
 	RESOLVING
 	RESOLVED
 )
 
+/**
+ * An internal structure für handling single producer-functions (caching, state-handling)
+ */
 type provider struct {
 	producer interface{}
 	producedType reflect.Type
 	state providerState
 	value reflect.Value
 }
+
+func (provider *provider) get(container *Container) (reflect.Value, error) {
+	switch provider.state {
+	case UNRESOLVED: {
+		provider.state = RESOLVING
+		producerType := reflect.TypeOf(provider.producer)
+		producerCallArgs := make([]reflect.Value, producerType.NumIn())
+		for i := 0;  i<producerType.NumIn(); i++ {
+			paramType := producerType.In(i)
+			var err error
+			producerCallArgs[i], err = container.find(paramType)
+			if nil != err {
+				return reflect.NewAt(provider.producedType, nil), err
+			}
+		}
+		providerCallResults := reflect.ValueOf(provider.producer).Call(producerCallArgs)
+		provider.value = providerCallResults[0]
+		provider.state = RESOLVED
+		return provider.value, nil
+	}
+	case RESOLVING: {
+		return reflect.NewAt(provider.producedType, nil), errors.New("provider is already resolving: cyclic dependency detected")
+	}
+	case RESOLVED: {
+		return provider.value, nil
+	}
+	}
+	return reflect.NewAt(provider.producedType, nil), errors.New("illegal state: a provider should always have defined state")
+}
+
 
 func getType(producer interface{}) reflect.Type {
 	return reflect.TypeOf(producer).Out(0)
@@ -39,34 +77,6 @@ func newProvider(producer interface{}) *provider{
 	return p
 }
 
-func (provider *provider) get(container *Container) (reflect.Value, error) {
-	switch provider.state {
-		case UNRESOLVED: {
-			provider.state = RESOLVING
-			producerType := reflect.TypeOf(provider.producer)
-			producerCallArgs := make([]reflect.Value, producerType.NumIn())
-			for i := 0;  i<producerType.NumIn(); i++ {
-				paramType := producerType.In(i)
-				var err error
-				producerCallArgs[i], err = container.find(paramType)
-				if nil != err {
-					return reflect.NewAt(provider.producedType, nil), err
-				}
-			}
-			providerCallResults := reflect.ValueOf(provider.producer).Call(producerCallArgs)
-			provider.value = providerCallResults[0]
-			provider.state = RESOLVED
-			return provider.value, nil
-		}
-		case RESOLVING: {
-			return reflect.NewAt(provider.producedType, nil), errors.New("provider is already resolving: cyclic dependency detected")
-		}
-		case RESOLVED: {
-			return provider.value, nil
-		}
-	}
-	return reflect.NewAt(provider.producedType, nil), errors.New("illegal state: a provider should always have defined state")
-}
 
 func NewContainer() *Container {
 	container := new(Container)
