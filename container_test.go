@@ -36,7 +36,7 @@ func TestGetTypeForErrorReturningFuncsWithTypeFirst(t *testing.T) {
 func TestContainerHandlesMultiReturningProviders(t *testing.T) {
 	type A struct {}
 	container := NewContainer()
-	container.Provide(func() (error, *A){
+	container.Singleton(func() (error, *A){
 		return nil, &A{}
 	})
 	called := false
@@ -51,7 +51,7 @@ func TestContainerHandlesMultiReturningProviders(t *testing.T) {
 func TestContainerHandlesMultiReturningProvidersWithTypeFirst(t *testing.T) {
 	type A struct {}
 	container := NewContainer()
-	container.Provide(func() (*A, error){
+	container.Singleton(func() (*A, error){
 		return &A{}, nil
 	})
 	called := false
@@ -66,7 +66,7 @@ func TestContainerHandlesMultiReturningProvidersWithTypeFirst(t *testing.T) {
 func TestContainerPropagatesErrorInProvider(t *testing.T) {
 	type A struct {}
 	container := NewContainer()
-	container.Provide(func() (*A, error) {
+	container.Singleton(func() (*A, error) {
 		return nil, errors.New("FEHLER")
 	})
 	err := container.With(func(a *A) {})
@@ -100,7 +100,7 @@ func TestContainerProvidesASelfReference (t *testing.T) {
 
 func TestContainerConstructorFunction(t *testing.T) {
 	container := NewContainer()
-	container.Provide(func() *Repository {
+	container.Singleton(func() *Repository {
 		return new(Repository)
 	})
 	container.With(func(repo *Repository) {
@@ -114,7 +114,7 @@ func TestContainerCachesProvidedComponents(t *testing.T) {
 	container := NewContainer()
 	type A struct {}
 	counter := 0
-	container.Provide(func() *A {
+	container.Singleton(func() *A {
 		counter ++
 		return new(A)
 	})
@@ -127,7 +127,7 @@ func TestContainerCachesProvidedComponents(t *testing.T) {
 
 func TestContainerResolvesTransitiveDependencies(t *testing.T) {
 	container := NewContainer()
-	container.Provide(func(context *Container) *Repository {
+	container.Singleton(func(context *Container) *Repository {
 		return new(Repository)
 	})
 	err := container.With(func(repo *Repository) {
@@ -144,10 +144,10 @@ func TestContaineShouldFailOnCyclicDependency(t *testing.T) {
 	container := NewContainer()
 	type A struct {}
 	type B struct {}
-	container.Provide(func(a *A) *B {
+	container.Singleton(func(a *A) *B {
 		return new(B)
 	})
-	container.Provide(func(a *B) *A {
+	container.Singleton(func(a *B) *A {
 		return new(A)
 	})
 	err := container.With(func(a *A) {})
@@ -185,7 +185,7 @@ func TestContainerWithCallsNeedToBeOnFunctions(t *testing.T) {
 func TestContainerProvideCallsNeedToBeOnFunctions(t *testing.T) {
 	type A struct {}
 	container := NewContainer()
-	err := container.Provide(&A{})
+	err := container.Singleton(&A{})
 	if nil == err {
 		t.Error("With-Call should have returned an error but didnt ")
 	}

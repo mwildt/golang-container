@@ -16,7 +16,7 @@ type Container struct {
 func NewContainer() *Container {
 	container := new(Container)
 	container.providers = make(map[reflect.Type]*provider)
-	container.Provide(func() *Container {
+	container.Singleton(func() *Container {
 		return container
 	})
 	return container
@@ -25,7 +25,7 @@ func NewContainer() *Container {
 /**
  * registers a new provider to the containers context using a producer function
  */
-func (container *Container) Provide(producer interface{}) error {
+func (container *Container) Singleton(producer interface{}) error {
 	if reflect.TypeOf(producer).Kind() != reflect.Func {
 		return errors.New("producer is not of Kind reflect.Func")
 	}
