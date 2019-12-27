@@ -23,7 +23,7 @@ func NewContainer() *Container {
 }
 
 /**
- * registers a new Provider using a producer function
+ * registers a new provider to the containers context using a producer function
  */
 func (container *Container) Provide(producer interface{}) error {
 	if reflect.TypeOf(producer).Kind() != reflect.Func {
@@ -34,9 +34,8 @@ func (container *Container) Provide(producer interface{}) error {
 	return nil
 }
 
-
 /**
- * Invokes a function
+ * Invokes a target-function with params resolved from the containers context
  */
 func(container *Container) With(target interface{}) error {
 	if reflect.TypeOf(target).Kind() != reflect.Func {
@@ -53,7 +52,6 @@ func(container *Container) With(target interface{}) error {
 	}
 	return nil
 }
-
 
 func (container *Container) call(target interface{}) ([]reflect.Value, error) {
 	targetType := reflect.TypeOf(target)
