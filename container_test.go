@@ -169,3 +169,27 @@ func TestContainerPropagatesErrorsFromWithCalles(t *testing.T) {
 		t.Error(fmt.Sprintf("message should be %s but was %s", msg, err.Error()))
 	}
 }
+
+func TestContainerWithCallsNeedToBeOnFunctions(t *testing.T) {
+	type A struct {}
+	container := NewContainer()
+	err := container.With(&A{})
+	if nil == err {
+		t.Error("With-Call should have returned an error but didnt ")
+	}
+	if err.Error() != "target is not of Kind reflect.Func" {
+		t.Error(fmt.Sprintf("message should be 'target is not of Kind reflect.Func' but was %s", err.Error()))
+	}
+}
+
+func TestContainerProvideCallsNeedToBeOnFunctions(t *testing.T) {
+	type A struct {}
+	container := NewContainer()
+	err := container.Provide(&A{})
+	if nil == err {
+		t.Error("With-Call should have returned an error but didnt ")
+	}
+	if err.Error() != "producer is not of Kind reflect.Func" {
+		t.Error(fmt.Sprintf("message should be 'producer is not of Kind reflect.Func' but was %s", err.Error()))
+	}
+}

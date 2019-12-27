@@ -25,10 +25,35 @@ func NewContainer() *Container {
 /**
  * registers a new Provider using a producer function
  */
-func (container *Container) Provide(producer interface{}) {
+func (container *Container) Provide(producer interface{}) error {
+	if reflect.TypeOf(producer).Kind() != reflect.Func {
+		return errors.New("producer is not of Kind reflect.Func")
+	}
 	provider := newProvider(producer)
 	container.providers[provider.producedType] = provider
+	return nil
 }
+
+
+/**
+ * Invokes a function
+ */
+func(container *Container) With(target interface{}) error {
+	if reflect.TypeOf(target).Kind() != reflect.Func {
+		return errors.New("target is not of Kind reflect.Func")
+	}
+	values, err := container.call(target)
+	if nil != err {
+		return err
+	}
+	for _, returnValue := range values {
+		if returnValue.Type().Implements(errorInterface) && !returnValue.IsNil() {
+			return returnValue.Interface().(error)
+		}
+	}
+	return nil
+}
+
 
 func (container *Container) call(target interface{}) ([]reflect.Value, error) {
 	targetType := reflect.TypeOf(target)
@@ -42,22 +67,6 @@ func (container *Container) call(target interface{}) ([]reflect.Value, error) {
 		}
 	}
 	return reflect.ValueOf(target).Call(parameter), nil
-}
-
-/**
- * Invokes a function
- */
-func(container *Container) With(target interface{}) error {
-	values, err := container.call(target)
-	if nil != err {
-		return err
-	}
-	for _, returnValue := range values {
-		if returnValue.Type().Implements(errorInterface) && !returnValue.IsNil() {
-			return returnValue.Interface().(error)
-		}
-	}
-	return nil
 }
 
 func (container *Container) find(t reflect.Type) (reflect.Value, error) {
